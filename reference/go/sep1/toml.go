@@ -18,5 +18,16 @@ func RenderStellarTOML(cfg config.Config) string {
 	if cfg.QuoteServer != "" {
 		b.WriteString(fmt.Sprintf("ANCHOR_QUOTE_SERVER=\"%s\"\n", cfg.QuoteServer))
 	}
+
+	for _, asset := range cfg.Assets {
+		b.WriteString("\n[[CURRENCIES]]\n")
+		b.WriteString(fmt.Sprintf("code=\"%s\"\n", asset.Code))
+		b.WriteString("status=\"live\"\n")
+		b.WriteString("desc=\"Reference anchor asset\"\n")
+		b.WriteString("is_asset_anchored=true\n")
+		b.WriteString("anchor_asset_type=\"fiat\"\n")
+		b.WriteString(fmt.Sprintf("anchor_asset=\"%s\"\n", asset.Code))
+	}
+
 	return b.String()
 }

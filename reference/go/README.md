@@ -9,8 +9,6 @@ This module provides a runnable SEP reference server for:
 
 ```bash
 cp .env.example .env
-export SIGNING_KEY=dev-signing-key
-export JWT_SECRET=dev-jwt-secret
 go run ./cmd/server
 ```
 

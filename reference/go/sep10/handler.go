@@ -3,9 +3,13 @@ package sep10
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
+
+	"github.com/stellar/go/xdr"
 )
 
 type Service struct {
@@ -17,6 +21,7 @@ type Service struct {
 	NetworkPassphrase string
 	ChallengeTTL      time.Duration
 	TokenTTL          time.Duration
+	AccountSigners    AccountSignerLoader
 }
 
 type challengeResponse struct {
@@ -50,16 +55,15 @@ func NewService(serverAccount, serverSigningKey, jwtSecret, homeDomain, webAuthD
 }
 
 func (s *Service) BuildChallenge(account, clientDomain, homeDomain, memo string) (string, error) {
+	_ = clientDomain
 	if homeDomain == "" {
 		homeDomain = s.HomeDomain
 	}
 	return BuildChallenge(BuildParams{
-		ServerAccount:     s.ServerAccount,
 		ServerSigningKey:  s.ServerSigningKey,
 		ClientAccount:     account,
 		HomeDomain:        homeDomain,
 		WebAuthDomain:     s.WebAuthDomain,
-		ClientDomain:      clientDomain,
 		NetworkPassphrase: s.NetworkPassphrase,
 		Memo:              memo,
 		TTL:               s.ChallengeTTL,
@@ -68,10 +72,13 @@ func (s *Service) BuildChallenge(account, clientDomain, homeDomain, memo string)
 
 func (s *Service) VerifyAndIssueToken(encodedChallenge string) (string, error) {
 	result, err := VerifyChallenge(VerifyParams{
-		EncodedChallenge: encodedChallenge,
-		ServerAccount:    s.ServerAccount,
-		ServerSigningKey: s.ServerSigningKey,
-		RequireClientSig: true,
+		EncodedChallenge:  encodedChallenge,
+		ServerAccount:     s.ServerAccount,
+		NetworkPassphrase: s.NetworkPassphrase,
+		WebAuthDomain:     s.WebAuthDomain,
+		HomeDomains:       []string{s.HomeDomain},
+		RequireClientSig:  true,
+		AccountSigners:    s.AccountSigners,
 	})
 	if err != nil {
 		return "", err
@@ -100,6 +107,10 @@ func handleGetAuth(w http.ResponseWriter, r *http.Request, service *Service) {
 		writeError(w, http.StatusBadRequest, "missing account")
 		return
 	}
+	if !isValidStellarAddress(account) {
+		writeError(w, http.StatusBadRequest, "invalid account")
+		return
+	}
 	clientDomain := strings.TrimSpace(r.URL.Query().Get("client_domain"))
 	homeDomain := strings.TrimSpace(r.URL.Query().Get("home_domain"))
 	memo := strings.TrimSpace(r.URL.Query().Get("memo"))
@@ -118,9 +129,23 @@ func handleGetAuth(w http.ResponseWriter, r *http.Request, service *Service) {
 func handlePostAuth(w http.ResponseWriter, r *http.Request, service *Service) {
 	defer r.Body.Close()
 	var req verifyRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid json request")
+	raw, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
+	}
+	if len(strings.TrimSpace(string(raw))) == 0 {
+		writeError(w, http.StatusBadRequest, "missing transaction")
+		return
+	}
+
+	if err := json.Unmarshal(raw, &req); err != nil {
+		form, formErr := url.ParseQuery(string(raw))
+		if formErr != nil {
+			writeError(w, http.StatusBadRequest, "invalid request payload")
+			return
+		}
+		req.Transaction = strings.TrimSpace(form.Get("transaction"))
 	}
 	if strings.TrimSpace(req.Transaction) == "" {
 		writeError(w, http.StatusBadRequest, "missing transaction")
@@ -129,7 +154,7 @@ func handlePostAuth(w http.ResponseWriter, r *http.Request, service *Service) {
 
 	token, err := service.VerifyAndIssueToken(req.Transaction)
 	if err != nil {
-		writeError(w, http.StatusUnauthorized, fmt.Sprintf("challenge verification failed: %v", err))
+		writeError(w, statusCodeForVerifyError(err), fmt.Sprintf("challenge verification failed: %v", err))
 		return
 	}
 
@@ -144,4 +169,14 @@ func writeJSON(w http.ResponseWriter, code int, value any) {
 
 func writeError(w http.ResponseWriter, code int, message string) {
 	writeJSON(w, code, errorResponse{Error: message})
+}
+
+func isValidStellarAddress(raw string) bool {
+	if _, err := xdr.AddressToAccountId(raw); err == nil {
+		return true
+	}
+	if _, err := xdr.AddressToMuxedAccount(raw); err == nil {
+		return true
+	}
+	return false
 }

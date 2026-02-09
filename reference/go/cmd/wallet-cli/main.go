@@ -13,7 +13,8 @@ import (
 )
 
 type challengeResponse struct {
-	Transaction string `json:"transaction"`
+	Transaction       string `json:"transaction"`
+	NetworkPassphrase string `json:"network_passphrase"`
 }
 
 type tokenResponse struct {
@@ -22,16 +23,16 @@ type tokenResponse struct {
 
 func main() {
 	baseURL := flag.String("base-url", "http://localhost:8080", "server base URL")
-	account := flag.String("account", "GCLIENTACCOUNTAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", "client stellar account")
-	clientSecret := flag.String("client-secret", "client-secret", "client signing secret")
+	account := flag.String("account", "GCTSEPLDTRBIDEZ2WWOECTX5QPRTKD4GRDCRQBHWRDBTJROWJG2G6MGV", "client stellar account")
+	clientSecret := flag.String("client-secret", "SCFDN4SWA4VR2Z2FDMGSQSTIYKNAL7LLWD6LCBZ7OTZ4LORMHXY2HUT4", "client signing secret")
 	flag.Parse()
 
-	tx, err := getChallenge(*baseURL, *account)
+	tx, networkPassphrase, err := getChallenge(*baseURL, *account)
 	if err != nil {
 		panic(err)
 	}
 
-	signed, err := sep10.AddClientSignature(tx, *clientSecret)
+	signed, err := sep10.AddClientSignatureWithNetworkPassphrase(tx, *clientSecret, networkPassphrase)
 	if err != nil {
 		panic(err)
 	}
@@ -44,7 +45,7 @@ func main() {
 	fmt.Println(token)
 }
 
-func getChallenge(baseURL string, account string) (string, error) {
+func getChallenge(baseURL string, account string) (string, string, error) {
 	u, _ := url.Parse(baseURL + "/auth")
 	q := u.Query()
 	q.Set("account", account)
@@ -52,19 +53,19 @@ func getChallenge(baseURL string, account string) (string, error) {
 
 	resp, err := http.Get(u.String())
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		raw, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("get challenge failed: %s", string(raw))
+		return "", "", fmt.Errorf("get challenge failed: %s", string(raw))
 	}
 
 	var out challengeResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		return "", err
+		return "", "", err
 	}
-	return out.Transaction, nil
+	return out.Transaction, out.NetworkPassphrase, nil
 }
 
 func postChallenge(baseURL string, challenge string) (string, error) {

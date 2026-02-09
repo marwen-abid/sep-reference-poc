@@ -8,7 +8,7 @@ services:
       - HOME_DOMAIN=server:8080
       - WEB_AUTH_DOMAIN=server:8080
       - NETWORK_PASSPHRASE=Test SDF Network ; September 2015
-      - SIGNING_KEY=${SIGNING_KEY:-dev-signing-key}
+      - SIGNING_KEY=${SIGNING_KEY:-SCFDN4SWA4VR2Z2FDMGSQSTIYKNAL7LLWD6LCBZ7OTZ4LORMHXY2HUT4}
       - JWT_SECRET=${JWT_SECRET:-dev-jwt-secret}
       - ASSETS=${ASSETS:-USDC:1.0:0.10}
       - TRANSFER_SERVER=http://server:8080/sep24

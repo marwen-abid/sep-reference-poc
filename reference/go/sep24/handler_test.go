@@ -30,8 +30,8 @@ func TestAuthRequiredOnProtectedRoutes(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/sep24/transactions/deposit/interactive", bytes.NewBufferString(`{"asset_code":"USDC"}`))
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
-	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("expected 401, got %d", rec.Code)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d", rec.Code)
 	}
 }
 

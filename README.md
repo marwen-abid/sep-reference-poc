@@ -16,7 +16,6 @@ This workspace contains:
 ```bash
 cd reference/go
 cp .env.example .env
-# set SIGNING_KEY before running
 go run ./cmd/server
 ```
 

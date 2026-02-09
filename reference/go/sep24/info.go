@@ -3,9 +3,9 @@ package sep24
 import "net/http"
 
 type assetInfo struct {
-	Enabled    bool   `json:"enabled"`
-	FeeFixed   string `json:"fee_fixed"`
-	FeePercent string `json:"fee_percent"`
+	Enabled    bool    `json:"enabled"`
+	FeeFixed   float64 `json:"fee_fixed"`
+	FeePercent float64 `json:"fee_percent"`
 }
 
 func (s *Service) handleInfo(w http.ResponseWriter, r *http.Request) {
@@ -19,8 +19,8 @@ func (s *Service) handleInfo(w http.ResponseWriter, r *http.Request) {
 	for _, asset := range s.Config.Assets {
 		info := assetInfo{
 			Enabled:    asset.Enabled,
-			FeeFixed:   formatAmount(asset.FeeFixed),
-			FeePercent: formatAmount(asset.FeePercent),
+			FeeFixed:   asset.FeeFixed,
+			FeePercent: asset.FeePercent,
 		}
 		deposit[asset.Code] = info
 		withdraw[asset.Code] = info
@@ -29,5 +29,8 @@ func (s *Service) handleInfo(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{
 		"deposit":  deposit,
 		"withdraw": withdraw,
+		"fee": map[string]bool{
+			"enabled": true,
+		},
 	})
 }

@@ -1,18 +1,22 @@
 package sep10
 
 import (
-	"crypto/subtle"
-	"encoding/base64"
+	"errors"
 	"fmt"
-	"time"
+
+	"github.com/stellar/go/clients/horizonclient"
+	"github.com/stellar/go/network"
+	"github.com/stellar/go/txnbuild"
 )
 
 type VerifyParams struct {
-	EncodedChallenge string
-	ServerAccount    string
-	ServerSigningKey string
-	Now              time.Time
-	RequireClientSig bool
+	EncodedChallenge  string
+	ServerAccount     string
+	NetworkPassphrase string
+	WebAuthDomain     string
+	HomeDomains       []string
+	RequireClientSig  bool
+	AccountSigners    AccountSignerLoader
 }
 
 type VerifyResult struct {
@@ -21,74 +25,139 @@ type VerifyResult struct {
 	HomeDomain    string
 }
 
+type AccountSignerLoader func(accountID string) (txnbuild.SignerSummary, txnbuild.Threshold, bool, error)
+
+type verifyError struct {
+	Status int
+	Err    error
+}
+
+func (e *verifyError) Error() string {
+	return e.Err.Error()
+}
+
+func (e *verifyError) Unwrap() error {
+	return e.Err
+}
+
+func invalidChallenge(err error) error {
+	return &verifyError{Status: 400, Err: err}
+}
+
+func unauthorizedChallenge(err error) error {
+	return &verifyError{Status: 400, Err: err}
+}
+
+func statusCodeForVerifyError(err error) int {
+	var vErr *verifyError
+	if errors.As(err, &vErr) {
+		return vErr.Status
+	}
+	return 400
+}
+
 func VerifyChallenge(params VerifyParams) (VerifyResult, error) {
-	envelope, err := decodeEnvelope(params.EncodedChallenge)
+	if params.NetworkPassphrase == "" {
+		params.NetworkPassphrase = DefaultNetworkPassphrase
+	}
+	if len(params.HomeDomains) == 0 {
+		return VerifyResult{}, invalidChallenge(fmt.Errorf("at least one home domain is required"))
+	}
+
+	_, clientAccount, matchedHomeDomain, _, err := txnbuild.ReadChallengeTx(
+		params.EncodedChallenge,
+		params.ServerAccount,
+		params.NetworkPassphrase,
+		params.WebAuthDomain,
+		params.HomeDomains,
+	)
 	if err != nil {
+		return VerifyResult{}, invalidChallenge(fmt.Errorf("invalid challenge transaction: %w", err))
+	}
+
+	result := VerifyResult{
+		ClientAccount: clientAccount,
+		HomeDomain:    matchedHomeDomain,
+	}
+	if !params.RequireClientSig {
+		return result, nil
+	}
+
+	if err := verifyClientSignatures(params, clientAccount); err != nil {
 		return VerifyResult{}, err
 	}
-	challenge := envelope.Challenge
+	return result, nil
+}
 
-	if params.Now.IsZero() {
-		params.Now = time.Now().UTC()
-	}
-
-	if challenge.SourceAccount != params.ServerAccount {
-		return VerifyResult{}, fmt.Errorf("invalid source account")
-	}
-	if challenge.Sequence != 0 {
-		return VerifyResult{}, fmt.Errorf("invalid sequence")
-	}
-	if params.Now.After(challenge.ExpiresAt) {
-		return VerifyResult{}, fmt.Errorf("challenge expired")
-	}
-	if params.Now.Before(challenge.IssuedAt.Add(-1 * time.Minute)) {
-		return VerifyResult{}, fmt.Errorf("challenge issued-at is in the future")
-	}
-	if len(challenge.Operations) == 0 {
-		return VerifyResult{}, fmt.Errorf("challenge has no operations")
+func verifyClientSignatures(params VerifyParams, clientAccount string) error {
+	accountSigners := params.AccountSigners
+	if accountSigners == nil {
+		accountSigners = buildDefaultAccountSignerLoader(params.NetworkPassphrase)
 	}
 
-	first := challenge.Operations[0]
-	if first.Type != "manage_data" {
-		return VerifyResult{}, fmt.Errorf("invalid first operation type")
-	}
-	if first.Source != challenge.ClientAccount {
-		return VerifyResult{}, fmt.Errorf("first operation source mismatch")
-	}
-	if first.Name != challenge.HomeDomain+" auth" {
-		return VerifyResult{}, fmt.Errorf("first operation name mismatch")
-	}
-	nonce, err := base64.StdEncoding.DecodeString(first.Value)
+	signerSummary, threshold, exists, err := accountSigners(clientAccount)
 	if err != nil {
-		return VerifyResult{}, fmt.Errorf("invalid nonce encoding")
-	}
-	if len(nonce) != 64 {
-		return VerifyResult{}, fmt.Errorf("invalid nonce length")
+		return unauthorizedChallenge(fmt.Errorf("load account signers: %w", err))
 	}
 
-	payload, err := canonicalChallengeBytes(challenge)
-	if err != nil {
-		return VerifyResult{}, err
-	}
-	expectedServerSig := sign(payload, params.ServerSigningKey)
-	serverSig, ok := envelope.Signatures["server"]
-	if !ok {
-		return VerifyResult{}, fmt.Errorf("missing server signature")
-	}
-	if subtle.ConstantTimeCompare([]byte(serverSig), []byte(expectedServerSig)) != 1 {
-		return VerifyResult{}, fmt.Errorf("invalid server signature")
-	}
-
-	if params.RequireClientSig {
-		clientSig, ok := envelope.Signatures["client"]
-		if !ok || clientSig == "" {
-			return VerifyResult{}, fmt.Errorf("missing client signature")
+	if !exists {
+		_, verifyErr := txnbuild.VerifyChallengeTxSigners(
+			params.EncodedChallenge,
+			params.ServerAccount,
+			params.NetworkPassphrase,
+			params.WebAuthDomain,
+			params.HomeDomains,
+			clientAccount,
+		)
+		if verifyErr != nil {
+			return unauthorizedChallenge(fmt.Errorf("challenge verification failed: %w", verifyErr))
 		}
+		return nil
 	}
 
-	return VerifyResult{
-		ClientAccount: challenge.ClientAccount,
-		ClientDomain:  challenge.ClientDomain,
-		HomeDomain:    challenge.HomeDomain,
-	}, nil
+	_, verifyErr := txnbuild.VerifyChallengeTxThreshold(
+		params.EncodedChallenge,
+		params.ServerAccount,
+		params.NetworkPassphrase,
+		params.WebAuthDomain,
+		params.HomeDomains,
+		threshold,
+		signerSummary,
+	)
+	if verifyErr != nil {
+		return unauthorizedChallenge(fmt.Errorf("challenge verification failed: %w", verifyErr))
+	}
+	return nil
+}
+
+func buildDefaultAccountSignerLoader(networkPassphrase string) AccountSignerLoader {
+	hClient := horizonForNetwork(networkPassphrase)
+	return func(accountID string) (txnbuild.SignerSummary, txnbuild.Threshold, bool, error) {
+		account, err := hClient.AccountDetail(horizonclient.AccountRequest{AccountID: accountID})
+		if err != nil {
+			if horizonclient.IsNotFoundError(err) {
+				return nil, 0, false, nil
+			}
+			return nil, 0, false, err
+		}
+
+		signerSummary := txnbuild.SignerSummary(account.SignerSummary())
+		threshold := txnbuild.Threshold(account.Thresholds.MedThreshold)
+		if threshold < 1 {
+			threshold = 1
+		}
+
+		return signerSummary, threshold, true, nil
+	}
+}
+
+func horizonForNetwork(networkPassphrase string) *horizonclient.Client {
+	switch networkPassphrase {
+	case network.TestNetworkPassphrase:
+		return horizonclient.DefaultTestNetClient
+	case network.PublicNetworkPassphrase:
+		return horizonclient.DefaultPublicNetClient
+	default:
+		return horizonclient.DefaultTestNetClient
+	}
 }

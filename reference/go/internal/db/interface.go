@@ -3,19 +3,23 @@ package db
 import "time"
 
 type Transaction struct {
-	ID        string    `json:"id"`
-	Kind      string    `json:"kind"`
-	Status    string    `json:"status"`
-	Account   string    `json:"account"`
-	AssetCode string    `json:"asset_code"`
-	Amount    string    `json:"amount,omitempty"`
-	AmountIn  string    `json:"amount_in,omitempty"`
-	AmountOut string    `json:"amount_out,omitempty"`
-	AmountFee string    `json:"amount_fee,omitempty"`
-	URL       string    `json:"url,omitempty"`
-	StartedAt time.Time `json:"started_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-	KYCFields []string  `json:"kyc_fields,omitempty"`
+	ID                    string    `json:"id"`
+	Kind                  string    `json:"kind"`
+	Status                string    `json:"status"`
+	Account               string    `json:"account"`
+	From                  string    `json:"from,omitempty"`
+	To                    string    `json:"to,omitempty"`
+	AssetCode             string    `json:"asset_code"`
+	Amount                string    `json:"amount,omitempty"`
+	AmountIn              string    `json:"amount_in,omitempty"`
+	AmountOut             string    `json:"amount_out,omitempty"`
+	AmountFee             string    `json:"amount_fee,omitempty"`
+	StellarTransactionID  string    `json:"stellar_transaction_id,omitempty"`
+	ExternalTransactionID string    `json:"external_transaction_id,omitempty"`
+	URL                   string    `json:"url,omitempty"`
+	StartedAt             time.Time `json:"started_at"`
+	UpdatedAt             time.Time `json:"updated_at"`
+	KYCFields             []string  `json:"kyc_fields,omitempty"`
 }
 
 type TransactionStore interface {

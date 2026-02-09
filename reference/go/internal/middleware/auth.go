@@ -25,13 +25,13 @@ func SEP10Auth(jwtSecret string) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			auth := strings.TrimSpace(r.Header.Get("Authorization"))
 			if auth == "" || !strings.HasPrefix(strings.ToLower(auth), "bearer ") {
-				writeJSONError(w, http.StatusUnauthorized, "missing bearer token")
+				writeJSONError(w, http.StatusForbidden, "missing bearer token")
 				return
 			}
 			token := strings.TrimSpace(auth[7:])
 			claims, err := sep10.VerifyToken(token, jwtSecret)
 			if err != nil {
-				writeJSONError(w, http.StatusUnauthorized, "invalid bearer token")
+				writeJSONError(w, http.StatusForbidden, "invalid bearer token")
 				return
 			}
 			ctx := context.WithValue(r.Context(), accountKey, claims.Subject)

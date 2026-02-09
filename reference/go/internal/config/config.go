@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/stellar/go/keypair"
 )
 
 type Asset struct {
@@ -41,7 +43,7 @@ func Load() Config {
 		HomeDomain:          homeDomain,
 		WebAuthDomain:       getenv("WEB_AUTH_DOMAIN", homeDomain),
 		NetworkPassphrase:   getenv("NETWORK_PASSPHRASE", "Test SDF Network ; September 2015"),
-		SigningKey:          getenv("SIGNING_KEY", "dev-signing-key"),
+		SigningKey:          getenv("SIGNING_KEY", "SCFDN4SWA4VR2Z2FDMGSQSTIYKNAL7LLWD6LCBZ7OTZ4LORMHXY2HUT4"),
 		JWTSecret:           getenv("JWT_SECRET", "dev-jwt-secret"),
 		ChallengeTTL:        parseDuration(getenv("CHALLENGE_TTL", "5m"), 5*time.Minute),
 		TokenTTL:            parseDuration(getenv("TOKEN_TTL", "15m"), 15*time.Minute),
@@ -106,6 +108,10 @@ func parseAssetItem(item string) (string, float64, float64) {
 }
 
 func derivePseudoAccount(seed string) string {
+	if kp, err := keypair.ParseFull(seed); err == nil {
+		return kp.Address()
+	}
+
 	sum := sha256.Sum256([]byte(seed))
 	encoded := strings.ToUpper(hex.EncodeToString(sum[:]))
 	if len(encoded) < 55 {

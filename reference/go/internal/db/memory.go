@@ -50,7 +50,7 @@ func (s *MemoryTransactionStore) ListByAccount(account string, limit int, cursor
 	}
 
 	sort.Slice(items, func(i, j int) bool {
-		return items[i].StartedAt.Before(items[j].StartedAt)
+		return items[i].StartedAt.After(items[j].StartedAt)
 	})
 
 	if limit <= 0 || limit > len(items) {

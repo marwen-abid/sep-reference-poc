@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/stellar/go/xdr"
 	"github.com/stellar/sep-reference/reference/go/internal/db"
 )
 
@@ -23,8 +24,14 @@ func (s *Service) handleDepositInteractive(w http.ResponseWriter, r *http.Reques
 
 	account := accountFromRequest(r)
 	if account == "" {
-		writeError(w, http.StatusUnauthorized, "missing subject")
+		writeError(w, http.StatusForbidden, "missing subject")
 		return
+	}
+	if req.Account != "" {
+		if _, err := xdr.AddressToAccountId(req.Account); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid account")
+			return
+		}
 	}
 	if req.Account != "" && req.Account != account {
 		writeError(w, http.StatusForbidden, "account mismatch")
@@ -47,6 +54,7 @@ func (s *Service) handleDepositInteractive(w http.ResponseWriter, r *http.Reques
 		Kind:      "deposit",
 		Status:    StatusIncomplete,
 		Account:   account,
+		To:        account,
 		AssetCode: req.AssetCode,
 		Amount:    req.Amount,
 		URL:       url,
