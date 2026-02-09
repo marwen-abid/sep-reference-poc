@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sep-reference.local/specs/shared/jwt.schema.json",
+  "title": "SEP-10 JWT Claims",
+  "type": "object",
+  "required": ["sub", "iss", "iat", "exp", "jti", "client_domain"],
+  "properties": {
+    "sub": {"type": "string", "pattern": "^G[A-Z2-7]{55}$"},
+    "iss": {"type": "string"},
+    "iat": {"type": "integer"},
+    "exp": {"type": "integer"},
+    "jti": {"type": "string"},
+    "client_domain": {"type": "string"},
+    "home_domain": {"type": "string"}
+  },
+  "additionalProperties": true
+}

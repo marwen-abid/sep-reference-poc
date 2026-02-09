@@ -1,0 +1,264 @@
+openapi: 3.1.0
+info:
+  title: SEP-24 Interactive Deposit and Withdrawal
+  version: 1.0.0
+  description: API contract for SEP-24 interactive anchor flows.
+servers:
+  - url: https://example.com/sep24
+security:
+  - sep10Auth: []
+paths:
+  /info:
+    get:
+      operationId: getInfo
+      summary: Get anchor capabilities
+      security: []
+      responses:
+        '200':
+          description: Anchor info
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InfoResponse'
+  /transactions/deposit/interactive:
+    post:
+      operationId: createDepositInteractive
+      summary: Create interactive deposit transaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InteractiveRequest'
+      responses:
+        '200':
+          description: Interactive URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InteractiveResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /transactions/withdraw/interactive:
+    post:
+      operationId: createWithdrawInteractive
+      summary: Create interactive withdrawal transaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InteractiveRequest'
+      responses:
+        '200':
+          description: Interactive URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InteractiveResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /transaction:
+    get:
+      operationId: getTransaction
+      summary: Get transaction by id
+      parameters:
+        - in: query
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Transaction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /transactions:
+    get:
+      operationId: listTransactions
+      summary: List transactions for account
+      parameters:
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+        - in: query
+          name: cursor
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Transactions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionsResponse'
+  /fee:
+    get:
+      operationId: getFee
+      summary: Get fee estimate
+      parameters:
+        - in: query
+          name: operation
+          required: true
+          schema:
+            type: string
+            enum: [deposit, withdraw]
+        - in: query
+          name: asset_code
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: amount
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Fee quote
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeeResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+components:
+  securitySchemes:
+    sep10Auth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    AssetConfig:
+      type: object
+      required: [asset_code, enabled]
+      properties:
+        asset_code:
+          type: string
+        enabled:
+          type: boolean
+        fee_fixed:
+          type: string
+        fee_percent:
+          type: string
+    InfoResponse:
+      type: object
+      required: [deposit, withdraw]
+      properties:
+        deposit:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/AssetConfig'
+        withdraw:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/AssetConfig'
+    InteractiveRequest:
+      type: object
+      required: [asset_code, account]
+      properties:
+        asset_code:
+          type: string
+        account:
+          type: string
+        amount:
+          type: string
+        lang:
+          type: string
+    InteractiveResponse:
+      type: object
+      required: [id, type, url]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [interactive_customer_info_needed]
+        url:
+          type: string
+          format: uri
+    Transaction:
+      type: object
+      required: [id, kind, status, account, asset_code, started_at]
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+          enum: [deposit, withdraw]
+        status:
+          type: string
+        account:
+          type: string
+        asset_code:
+          type: string
+        amount_in:
+          type: string
+        amount_out:
+          type: string
+        amount_fee:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    TransactionResponse:
+      type: object
+      required: [transaction]
+      properties:
+        transaction:
+          $ref: '#/components/schemas/Transaction'
+    TransactionsResponse:
+      type: object
+      required: [transactions]
+      properties:
+        transactions:
+          type: array
+          items:
+            $ref: '#/components/schemas/Transaction'
+    FeeResponse:
+      type: object
+      required: [fee]
+      properties:
+        fee:
+          type: string
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Authentication failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

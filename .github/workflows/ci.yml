@@ -1,0 +1,98 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Spec lint
+        run: make spec-lint
+
+      - name: Traceability check
+        run: make traceability-check
+
+      - name: Divergence baseline check
+        run: make divergence-check
+
+      - name: Go tests
+        run: make test
+
+  compliance:
+    runs-on: ubuntu-latest
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: sep-1-10
+            seps: "1 10"
+          - name: sep-1-10-24
+            seps: "1 10 24"
+    name: compliance-${{ matrix.name }}
+    env:
+      ADDR: ":8080"
+      HOME_DOMAIN: "localhost:8080"
+      WEB_AUTH_DOMAIN: "localhost:8080"
+      NETWORK_PASSPHRASE: "Test SDF Network ; September 2015"
+      SIGNING_KEY: "ci-signing-key"
+      JWT_SECRET: "ci-jwt-secret"
+      ASSETS: "USDC:1.0:0.10,EURC:1.0:0.10"
+      TRANSFER_SERVER: "http://localhost:8080/sep24"
+      TRANSFER_SERVER_SEP0024: "http://localhost:8080/sep24"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Start reference server
+        working-directory: reference/go
+        run: |
+          nohup go run ./cmd/server > /tmp/sep-reference.log 2>&1 &
+          echo $! > /tmp/sep-reference.pid
+
+      - name: Wait for server readiness
+        run: |
+          for i in {1..30}; do
+            if curl -sf http://localhost:8080/healthz >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Server did not become healthy in time"
+          cat /tmp/sep-reference.log || true
+          exit 1
+
+      - name: Run anchor-tests matrix
+        run: npx --yes @stellar/anchor-tests --home-domain http://localhost:8080 --seps ${{ matrix.seps }} --verbose
+
+      - name: Server logs on failure
+        if: failure()
+        run: cat /tmp/sep-reference.log || true
+
+      - name: Stop server
+        if: always()
+        run: |
+          if [ -f /tmp/sep-reference.pid ]; then
+            kill "$(cat /tmp/sep-reference.pid)" || true
+          fi

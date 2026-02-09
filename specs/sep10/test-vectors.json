@@ -1,0 +1,61 @@
+{
+  "version": "1.0.0",
+  "sep": 10,
+  "vectors": [
+    {
+      "id": "sep10-valid-challenge",
+      "description": "Build challenge with correct source, sequence, and nonce",
+      "type": "challenge_generation",
+      "input": {
+        "server_account": "GASERVERACCOUNT00000000000000000000000000000000000000000000",
+        "client_account": "GACLIENTACCOUNT0000000000000000000000000000000000000000000",
+        "home_domain": "example.com",
+        "timeout_seconds": 300
+      },
+      "expected": {
+        "transaction_source": "server_account",
+        "sequence": 0,
+        "first_op": "manage_data",
+        "first_op_source": "client_account",
+        "nonce_bytes": 64,
+        "server_signature_present": true
+      }
+    },
+    {
+      "id": "sep10-invalid-source",
+      "description": "Reject challenge if source account mismatches server signing key",
+      "type": "verification_failure",
+      "input": {
+        "challenge": "invalid-source-xdr"
+      },
+      "expected": {
+        "valid": false,
+        "error_code": "INVALID_SOURCE_ACCOUNT"
+      }
+    },
+    {
+      "id": "sep10-expired",
+      "description": "Reject expired challenge transaction",
+      "type": "verification_failure",
+      "input": {
+        "challenge": "expired-xdr"
+      },
+      "expected": {
+        "valid": false,
+        "error_code": "EXPIRED_CHALLENGE"
+      }
+    },
+    {
+      "id": "sep10-missing-client-signature",
+      "description": "Reject challenge lacking client signature",
+      "type": "verification_failure",
+      "input": {
+        "challenge": "unsigned-by-client"
+      },
+      "expected": {
+        "valid": false,
+        "error_code": "MISSING_CLIENT_SIGNATURE"
+      }
+    }
+  ]
+}

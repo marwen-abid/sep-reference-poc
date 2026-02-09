@@ -1,0 +1,75 @@
+{
+  "version": "1.0.0",
+  "sep": 24,
+  "vectors": [
+    {
+      "id": "sep24-deposit-interactive-success",
+      "description": "Create interactive deposit transaction",
+      "type": "deposit_interactive",
+      "input": {
+        "account": "GACLIENTACCOUNT0000000000000000000000000000000000000000000",
+        "asset_code": "USDC",
+        "amount": "100.00"
+      },
+      "expected": {
+        "status": 200,
+        "response_fields": ["id", "type", "url"],
+        "transaction_status": "incomplete"
+      }
+    },
+    {
+      "id": "sep24-withdraw-interactive-success",
+      "description": "Create interactive withdraw transaction",
+      "type": "withdraw_interactive",
+      "input": {
+        "account": "GACLIENTACCOUNT0000000000000000000000000000000000000000000",
+        "asset_code": "USDC",
+        "amount": "50.00"
+      },
+      "expected": {
+        "status": 200,
+        "response_fields": ["id", "type", "url"],
+        "transaction_status": "incomplete"
+      }
+    },
+    {
+      "id": "sep24-unauthorized",
+      "description": "Reject protected endpoint without bearer token",
+      "type": "auth_failure",
+      "input": {
+        "endpoint": "/transactions/deposit/interactive"
+      },
+      "expected": {
+        "status": 401,
+        "error": "missing bearer token"
+      }
+    },
+    {
+      "id": "sep24-invalid-transition",
+      "description": "Reject direct transition from incomplete to completed",
+      "type": "state_machine_failure",
+      "input": {
+        "from": "incomplete",
+        "to": "completed"
+      },
+      "expected": {
+        "valid": false,
+        "error_code": "INVALID_TRANSITION"
+      }
+    },
+    {
+      "id": "sep24-fee-success",
+      "description": "Return fee estimate for operation",
+      "type": "fee_lookup",
+      "input": {
+        "operation": "deposit",
+        "asset_code": "USDC",
+        "amount": "100.00"
+      },
+      "expected": {
+        "status": 200,
+        "response_fields": ["fee"]
+      }
+    }
+  ]
+}

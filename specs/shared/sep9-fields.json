@@ -1,0 +1,11 @@
+{
+  "version": "1.0.0",
+  "description": "SEP-9 field catalog for interactive KYC forms",
+  "fields": [
+    {"name": "first_name", "type": "string", "required": false},
+    {"name": "last_name", "type": "string", "required": false},
+    {"name": "email_address", "type": "string", "required": false},
+    {"name": "birth_date", "type": "string", "required": false},
+    {"name": "address_country_code", "type": "string", "required": false}
+  ]
+}

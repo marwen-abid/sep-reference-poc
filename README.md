@@ -1,0 +1,35 @@
+# SEP Reference
+
+`sep-reference` is a spec-first reference package for Stellar Ecosystem Proposals (SEPs) focused on anchor services.
+
+This workspace contains:
+- Machine-readable specifications for SEP-10 and SEP-24
+- Shared schemas and test vectors
+- A Go reference server with SEP-1, SEP-10, and SEP-24 endpoints
+- Compliance and traceability artifacts that map SEP requirements to tests
+
+## Quick Start
+
+```bash
+cd reference/go
+cp .env.example .env
+# set SIGNING_KEY before running
+go run ./cmd/server
+```
+
+## Compliance Workflow
+
+```bash
+make test
+make compliance-sep10
+make compliance-sep24
+```
+
+## Normative Source
+
+Official SEP specs are in the Stellar protocol repository:
+- https://github.com/stellar/stellar-protocol/tree/master/ecosystem
+
+For requirement mapping, see:
+- `specs/traceability/sep1-sep10-matrix.md`
+- `specs/traceability/sep24-matrix.md`
