@@ -49,7 +49,6 @@ jobs:
       HOME_DOMAIN: "localhost:8080"
       WEB_AUTH_DOMAIN: "localhost:8080"
       NETWORK_PASSPHRASE: "Test SDF Network ; September 2015"
-      SIGNING_KEY: "ci-signing-key"
       JWT_SECRET: "ci-jwt-secret"
       ASSETS: "USDC:1.0:0.10,EURC:1.0:0.10"
       TRANSFER_SERVER: "http://localhost:8080/sep24"
@@ -64,6 +63,30 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+
+      - uses: stellar/stellar-cli@v23.0.1
+        with:
+          version: 23.0.1
+
+      - name: Generate and fund Stellar test account
+        run: |
+          set -euo pipefail
+
+          STELLAR_CONFIG_DIR="${RUNNER_TEMP}/stellar"
+          KEY_NAME="ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-${{ matrix.name }}"
+
+          mkdir -p "${STELLAR_CONFIG_DIR}"
+          stellar --config-dir "${STELLAR_CONFIG_DIR}" --quiet keys generate "${KEY_NAME}" --overwrite
+
+          SERVER_ACCOUNT="$(stellar --config-dir "${STELLAR_CONFIG_DIR}" --quiet keys public-key "${KEY_NAME}")"
+          SIGNING_KEY="$(stellar --config-dir "${STELLAR_CONFIG_DIR}" --quiet keys secret "${KEY_NAME}")"
+
+          {
+            echo "SERVER_ACCOUNT=${SERVER_ACCOUNT}"
+            echo "SIGNING_KEY=${SIGNING_KEY}"
+          } >> "$GITHUB_ENV"
+
+          curl -fsS "https://friendbot.stellar.org/?addr=${SERVER_ACCOUNT}" >/tmp/friendbot.json
 
       - name: Start reference server
         working-directory: reference/go
