@@ -40,8 +40,38 @@
         "endpoint": "/transactions/deposit/interactive"
       },
       "expected": {
-        "status": 401,
+        "status": 403,
         "error": "missing bearer token"
+      }
+    },
+    {
+      "id": "sep24-transaction-by-stellar-id-not-found",
+      "description": "Return 404 when a transaction cannot be found by stellar_transaction_id",
+      "type": "transaction_lookup_failure",
+      "input": {
+        "endpoint": "/transaction",
+        "query": {
+          "stellar_transaction_id": "021581089cb614be94b0ac5dc71cadf23a1cd96a2584152268de505ee2e5e999"
+        }
+      },
+      "expected": {
+        "status": 404,
+        "error": "transaction not found"
+      }
+    },
+    {
+      "id": "sep24-transactions-filter-kind-withdrawal",
+      "description": "Filter transactions by kind=withdrawal",
+      "type": "transactions_filter",
+      "input": {
+        "endpoint": "/transactions",
+        "query": {
+          "asset_code": "USDC",
+          "kind": "withdrawal"
+        }
+      },
+      "expected": {
+        "status": 200
       }
     },
     {

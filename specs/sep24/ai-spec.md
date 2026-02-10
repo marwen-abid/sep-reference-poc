@@ -8,7 +8,7 @@ This specification defines implementation guidance for SEP-24 interactive flows.
 
 - Depends on: SEP-1, SEP-10, SEP-12
 - Endpoints: `GET /info`, `POST /transactions/deposit/interactive`, `POST /transactions/withdraw/interactive`, `GET /transaction`, `GET /transactions`, `GET /fee`
-- Authentication: SEP-10 JWT for protected routes
+- Authentication: SEP-10 JWT for protected routes (`403` when missing/invalid)
 
 ## Implementation Requirements
 
@@ -19,8 +19,8 @@ This specification defines implementation guidance for SEP-24 interactive flows.
 - [ ] Support `GET /info` with supported assets and fee details.
 - [ ] Create transaction record and return interactive URL for deposit interactive requests.
 - [ ] Create transaction record and return interactive URL for withdrawal interactive requests.
-- [ ] Expose transaction lookup endpoint by id.
-- [ ] Expose transaction list endpoint scoped to authenticated account.
+- [ ] Expose transaction lookup endpoint by `id`, `external_transaction_id`, and `stellar_transaction_id`.
+- [ ] Expose transaction list endpoint scoped to authenticated account and support `asset_code`, `kind`, `limit`, and `no_older_than`.
 - [ ] Use SEP-24 state values and reject invalid transitions.
 - [ ] Return deterministic error payloads.
 
@@ -39,26 +39,40 @@ This specification defines implementation guidance for SEP-24 interactive flows.
 ### GET /info
 
 Returns anchor capabilities, supported assets, and feature flags.
+`fee_fixed` and `fee_percent` are numeric values.
 
 ### POST /transactions/deposit/interactive
 
 Creates interactive deposit session and returns transaction id + URL.
+`account` is optional, but if present must be a valid Stellar account and match JWT subject.
 
 ### POST /transactions/withdraw/interactive
 
 Creates interactive withdrawal session and returns transaction id + URL.
+`account` is optional, but if present must be a valid Stellar account and match JWT subject.
 
 ### GET /transaction
 
-Returns one transaction by id and authenticated account.
+Returns one transaction for the authenticated account, queried by one of:
+- `id`
+- `external_transaction_id`
+- `stellar_transaction_id`
+
+Response transaction shape includes SEP-24 fields such as `more_info_url`, `kind` (`deposit` or `withdrawal`), and required `to`/`from` fields depending on kind.
 
 ### GET /transactions
 
-Returns paginated transaction list for authenticated account.
+Returns transaction list for authenticated account with support for:
+- `asset_code`
+- `kind` (`deposit`, `withdrawal`)
+- `limit`
+- `no_older_than`
+
+Results are returned in descending `started_at` order.
 
 ### GET /fee
 
-Returns fee for operation and asset pair. May integrate quote logic.
+Returns fee for operation and asset pair as a numeric `fee` field. May integrate quote logic.
 
 ## Security Considerations
 

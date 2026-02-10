@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: SEP-24 Interactive Deposit and Withdrawal
-  version: 1.0.0
-  description: API contract for SEP-24 interactive anchor flows.
+  version: 1.1.0
+  description: API contract for SEP-24 interactive anchor flows implemented by this repository.
 servers:
   - url: https://example.com/sep24
 security:
@@ -39,8 +39,8 @@ paths:
                 $ref: '#/components/schemas/InteractiveResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /transactions/withdraw/interactive:
     post:
       operationId: createWithdrawInteractive
@@ -60,16 +60,28 @@ paths:
                 $ref: '#/components/schemas/InteractiveResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /transaction:
     get:
       operationId: getTransaction
-      summary: Get transaction by id
+      summary: Get a single transaction
+      description: |
+        At least one of `id`, `external_transaction_id`, or `stellar_transaction_id` must be provided.
       parameters:
         - in: query
           name: id
-          required: true
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: external_transaction_id
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: stellar_transaction_id
+          required: false
           schema:
             type: string
       responses:
@@ -79,25 +91,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TransactionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
   /transactions:
     get:
       operationId: listTransactions
-      summary: List transactions for account
+      summary: List transactions for authenticated account
       parameters:
+        - in: query
+          name: asset_code
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: kind
+          required: false
+          schema:
+            type: string
+            enum: [deposit, withdrawal]
+        - in: query
+          name: no_older_than
+          required: false
+          schema:
+            type: string
+            format: date-time
         - in: query
           name: limit
           required: false
           schema:
             type: integer
             minimum: 1
-            maximum: 200
-        - in: query
-          name: cursor
-          required: false
-          schema:
-            type: string
       responses:
         '200':
           description: Transactions
@@ -105,6 +132,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TransactionsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
   /fee:
     get:
       operationId: getFee
@@ -135,6 +166,8 @@ paths:
                 $ref: '#/components/schemas/FeeResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 components:
   securitySchemes:
     sep10Auth:
@@ -142,38 +175,54 @@ components:
       scheme: bearer
       bearerFormat: JWT
   schemas:
-    AssetConfig:
+    AssetCapability:
       type: object
-      required: [asset_code, enabled]
+      required: [enabled]
+      additionalProperties: false
       properties:
-        asset_code:
-          type: string
         enabled:
           type: boolean
         fee_fixed:
-          type: string
+          type: number
         fee_percent:
-          type: string
+          type: number
+        fee_minimum:
+          type: number
+        min_amount:
+          type: number
+        max_amount:
+          type: number
+    FeeConfig:
+      type: object
+      required: [enabled]
+      properties:
+        enabled:
+          type: boolean
+        authentication_required:
+          type: boolean
     InfoResponse:
       type: object
-      required: [deposit, withdraw]
+      required: [deposit, withdraw, fee]
       properties:
         deposit:
           type: object
           additionalProperties:
-            $ref: '#/components/schemas/AssetConfig'
+            $ref: '#/components/schemas/AssetCapability'
         withdraw:
           type: object
           additionalProperties:
-            $ref: '#/components/schemas/AssetConfig'
+            $ref: '#/components/schemas/AssetCapability'
+        fee:
+          $ref: '#/components/schemas/FeeConfig'
     InteractiveRequest:
       type: object
-      required: [asset_code, account]
+      required: [asset_code]
       properties:
         asset_code:
           type: string
         account:
           type: string
+          description: Optional. If provided, must match the SEP-10 token subject.
         amount:
           type: string
         lang:
@@ -190,39 +239,115 @@ components:
         url:
           type: string
           format: uri
-    Transaction:
+    TransactionBase:
       type: object
-      required: [id, kind, status, account, asset_code, started_at]
+      required: [id, kind, status, more_info_url, started_at]
       properties:
         id:
           type: string
         kind:
           type: string
-          enum: [deposit, withdraw]
+          enum: [deposit, withdrawal]
         status:
           type: string
-        account:
+          enum:
+            - incomplete
+            - pending_anchor
+            - pending_external
+            - pending_stellar
+            - pending_trust
+            - pending_user
+            - pending_user_transfer_start
+            - pending_user_transfer_complete
+            - completed
+            - refunded
+            - expired
+            - no_market
+            - too_small
+            - too_large
+            - error
+        status_eta:
+          type: [number, 'null']
+        kyc_verified:
+          type: [boolean, 'null']
+        more_info_url:
           type: string
-        asset_code:
-          type: string
+          format: uri
         amount_in:
-          type: string
+          type: [string, 'null']
+        amount_in_asset:
+          type: [string, 'null']
         amount_out:
-          type: string
+          type: [string, 'null']
+        amount_out_asset:
+          type: [string, 'null']
         amount_fee:
-          type: string
+          type: [string, 'null']
+        amount_fee_asset:
+          type: [string, 'null']
         started_at:
           type: string
           format: date-time
-        updated_at:
-          type: string
+        completed_at:
+          type: [string, 'null']
           format: date-time
+        updated_at:
+          type: [string, 'null']
+          format: date-time
+        stellar_transaction_id:
+          type: [string, 'null']
+        external_transaction_id:
+          type: [string, 'null']
+        message:
+          type: [string, 'null']
+        refunded:
+          type: [boolean, 'null']
+        refunds:
+          type: [object, 'null']
+    DepositTransaction:
+      allOf:
+        - $ref: '#/components/schemas/TransactionBase'
+        - type: object
+          required: [to]
+          properties:
+            kind:
+              const: deposit
+            to:
+              type: string
+            from:
+              type: [string, 'null']
+            deposit_memo:
+              type: [string, 'null']
+            deposit_memo_type:
+              type: [string, 'null']
+            claimable_balance_id:
+              type: [string, 'null']
+    WithdrawalTransaction:
+      allOf:
+        - $ref: '#/components/schemas/TransactionBase'
+        - type: object
+          required: [from]
+          properties:
+            kind:
+              const: withdrawal
+            from:
+              type: string
+            to:
+              type: [string, 'null']
+            withdraw_anchor_account:
+              type: [string, 'null']
+            withdraw_memo:
+              type: [string, 'null']
+            withdraw_memo_type:
+              type: [string, 'null']
     TransactionResponse:
       type: object
       required: [transaction]
       properties:
         transaction:
-          $ref: '#/components/schemas/Transaction'
+          anyOf:
+            - $ref: '#/components/schemas/DepositTransaction'
+            - $ref: '#/components/schemas/WithdrawalTransaction'
     TransactionsResponse:
       type: object
       required: [transactions]
@@ -230,13 +355,15 @@ components:
         transactions:
           type: array
           items:
-            $ref: '#/components/schemas/Transaction'
+            anyOf:
+              - $ref: '#/components/schemas/DepositTransaction'
+              - $ref: '#/components/schemas/WithdrawalTransaction'
     FeeResponse:
       type: object
       required: [fee]
       properties:
         fee:
-          type: string
+          type: number
     ErrorResponse:
       type: object
       required: [error]
@@ -250,8 +377,8 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
-    Unauthorized:
-      description: Authentication failed
+    Forbidden:
+      description: Missing or invalid SEP-10 bearer token, or access forbidden
       content:
         application/json:
           schema:

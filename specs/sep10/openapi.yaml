@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: SEP-10 Stellar Web Authentication
-  version: 1.0.0
+  version: 1.1.0
   description: API contract for SEP-10 challenge and token flow.
 servers:
   - url: https://example.com
@@ -16,7 +16,7 @@ paths:
           required: true
           schema:
             type: string
-            pattern: '^G[A-Z2-7]{55}$'
+          description: Stellar address for the client account.
         - in: query
           name: home_domain
           required: false
@@ -50,6 +50,9 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/ChallengeVerifyRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ChallengeVerifyRequest'
       responses:
         '200':
           description: JWT token
@@ -59,8 +62,6 @@ paths:
                 $ref: '#/components/schemas/TokenResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
 components:
   schemas:
     ChallengeResponse:
@@ -92,12 +93,6 @@ components:
   responses:
     BadRequest:
       description: Invalid request
-      content:
-        application/json:
-          schema:
-            $ref: '#/components/schemas/ErrorResponse'
-    Unauthorized:
-      description: Authentication failed
       content:
         application/json:
           schema:

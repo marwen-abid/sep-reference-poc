@@ -27,6 +27,7 @@
 | SEP10-010 | SEP-10 token | Server SHOULD return JWT only after successful verification | `reference/go/sep10/jwt.go` | `SEP10_JWT_001` | IMPLEMENTED |
 | SEP10-011 | SEP-10 API | `GET /auth` challenge endpoint response shape | `reference/go/sep10/handler.go` | `SEP10_API_001` | IMPLEMENTED |
 | SEP10-012 | SEP-10 API | `POST /auth` token endpoint response shape | `reference/go/sep10/handler.go` | `SEP10_API_002` | IMPLEMENTED |
+| SEP10-013 | SEP-10 API | `POST /auth` MUST accept JSON and form-encoded challenge payloads | `reference/go/sep10/handler.go` | `SEP10_API_003` | IMPLEMENTED |
 
 ## Verification Commands
 

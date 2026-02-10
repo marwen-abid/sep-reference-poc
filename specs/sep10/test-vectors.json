@@ -56,6 +56,19 @@
         "valid": false,
         "error_code": "MISSING_CLIENT_SIGNATURE"
       }
+    },
+    {
+      "id": "sep10-post-auth-form-encoded",
+      "description": "Accept form-encoded payload for POST /auth",
+      "type": "api_success",
+      "input": {
+        "content_type": "application/x-www-form-urlencoded",
+        "body": "transaction=AAAA..."
+      },
+      "expected": {
+        "status": 200,
+        "response_fields": ["token"]
+      }
     }
   ]
 }

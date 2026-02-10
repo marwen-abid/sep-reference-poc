@@ -15,13 +15,14 @@ This document defines an implementation-focused specification for SEP-10 authent
 ### Server MUST
 
 - [ ] Publish `WEB_AUTH_ENDPOINT` in `stellar.toml`.
-- [ ] Build challenge transactions with source account set to server signing key.
+- [ ] Build challenge transactions as Stellar transaction XDR with source account set to server signing key.
 - [ ] Set challenge sequence number to `0`.
 - [ ] Include first `manageData` operation with source set to client account.
 - [ ] Generate 64-byte cryptographically secure nonce in first `manageData` value.
 - [ ] Sign challenge transaction with server signing key.
 - [ ] Verify challenge source account, time bounds, operations, and signatures.
 - [ ] Return JWT only after successful verification.
+- [ ] Accept `POST /auth` request payloads in both JSON and form-encoded shapes.
 
 ### Server MUST NOT
 
@@ -82,7 +83,7 @@ This document defines an implementation-focused specification for SEP-10 authent
 }
 ```
 
-**Error Response (400/401)**
+**Error Response (400)**
 
 ```json
 {
